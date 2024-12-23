@@ -13,12 +13,12 @@ public class UrlShortnerApplication {
 
 	public static void main(String[] args) {
 
-		ApplicationContext context = SpringApplication.run(UrlShortnerApplication.class, args);
+        SpringApplication.run(UrlShortnerApplication.class, args);
 
-		UrlSchemaRepository schemaRepository = context.getBean(UrlSchemaRepository.class);
-
-		// Create schema (tables)
-		schemaRepository.createSchema();
+//		UrlSchemaRepository schemaRepository = context.getBean(UrlSchemaRepository.class);
+//
+//		// Create schema (tables)
+//		schemaRepository.createSchema();
 
 
 

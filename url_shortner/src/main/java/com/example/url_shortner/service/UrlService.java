@@ -1,8 +1,11 @@
 package com.example.url_shortner.service;
 
-import com.example.url_shortner.dto.OriginalUrlDto;
+
 import com.example.url_shortner.dto.ShortCodeResponseDto;
+import com.example.url_shortner.exceptions.ResourceNotFoundException;
+import com.example.url_shortner.model.UrlModel;
 import com.example.url_shortner.repository.UrlRepository;
+import jakarta.transaction.Transactional;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -11,6 +14,7 @@ import org.springframework.stereotype.Service;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
+import java.util.Optional;
 
 @Service
 public class UrlService {
@@ -19,16 +23,28 @@ public class UrlService {
     private static final int SHORT_CODE_LENGTH = 7;
     private final UrlRepository urlRepository;
 
-    public  UrlService(UrlRepository urlRepository){
+    public UrlService(UrlRepository urlRepository){
         this.urlRepository = urlRepository;
     }
 
     public ResponseEntity<?> createShortUrl(String url){
+
+        Optional<UrlModel> existingUrl = urlRepository.findByOriginalUrl(url);
+
+        if(existingUrl.isPresent()){
+            return new ResponseEntity<ShortCodeResponseDto>(new ShortCodeResponseDto(existingUrl.get().getShortCode()),
+                    HttpStatus.CONFLICT);
+        }
+
         try{
 
-        String short_code = generateUniqueShortCode(url);
+            String short_code = generateUniqueShortCode(url);
 
-         urlRepository.createUrlShortCode(url,short_code);
+            UrlModel urlModel = new UrlModel();
+
+            urlModel.setOriginalUrl(url);
+            urlModel.setShortCode(short_code);
+            urlRepository.save(urlModel);
 
             return new ResponseEntity<ShortCodeResponseDto>(new ShortCodeResponseDto(short_code), HttpStatus.CREATED);
         }catch(DataAccessException e){
@@ -37,12 +53,20 @@ public class UrlService {
 
     }
 
-    public String getOriginalUrl(String short_code){
-        OriginalUrlDto mapping = urlRepository.findByCode(short_code);
-        if (mapping == null) {
-            throw new RuntimeException("URL not found for code: " + short_code);
+    public Optional<UrlModel> getOriginalUrl(String shortCode){
+
+        return urlRepository.findByShortCode(shortCode);
+    }
+
+    @Transactional
+    public void deleteUrl(String shortCode){
+        Optional<UrlModel> url = urlRepository.findByShortCode(shortCode);
+
+        if(url.isEmpty()){
+            throw new ResourceNotFoundException(" No code with " + shortCode + " value exists " , HttpStatus.NOT_FOUND);
         }
-        return mapping.getUrl();
+
+        urlRepository.deleteByShortCode(shortCode);
     }
 
     private String generateUniqueShortCode(String originalUrl) {
@@ -78,7 +102,7 @@ public class UrlService {
             String finalShortCode = shortCode.toString().substring(0, SHORT_CODE_LENGTH);
 
 //             Ensure unique code
-            while (urlRepository.findByCode(finalShortCode) != null) {
+            while (!urlRepository.findByShortCode(finalShortCode).isEmpty()) {
                 finalShortCode = regenerateShortCode(finalShortCode);
             }
 
