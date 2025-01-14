@@ -21,7 +21,7 @@ public class UrlModel {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private Integer id;
 
     @Column(name="original_url",nullable = false)
     private String originalUrl;
@@ -36,11 +36,24 @@ public class UrlModel {
 
 
     @Column(name="num_visited",nullable = false)
-    private Long numVisited;
+    private Integer numVisited;
 
     @UpdateTimestamp
     @Column(name="last_visited_at", nullable = false,columnDefinition = "TEXT")
     @Convert(converter = TextBasedDateTimeConverter.class)
     private LocalDateTime lastVisitedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(
+            name = "user_id",
+            nullable = false
+    )
+    private User user;
+
+    @Column(name="expiry_date",nullable = true,columnDefinition = "TEXT")
+    @Convert(converter = TextBasedDateTimeConverter.class)
+    private LocalDateTime expiryDate;
+
+
 
 }

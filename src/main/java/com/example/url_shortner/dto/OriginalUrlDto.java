@@ -1,17 +1,16 @@
 package com.example.url_shortner.dto;
 
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+import java.time.LocalDateTime;
+
+@Getter
+@Setter
+@NoArgsConstructor
 public class OriginalUrlDto {
-        private String url;
-
-    public OriginalUrlDto(String url){
-        this.url = url;
-    }
-    public String getUrl() {
-        return url;
-    }
-
-    public void setUrl(String url) {
-        this.url = url;
-    }
-
+    private String url;
+    private LocalDateTime expiryDate;
+    private String shortCode;
 }
