@@ -27,7 +27,6 @@ public class User {
     @Column(unique = true,nullable = false)
     private String email;
 
-
     private String name;
 
     @Column(unique = true,name = "api_key",nullable = false)
@@ -38,6 +37,8 @@ public class User {
     @Convert(converter = TextBasedDateTimeConverter.class)
     private LocalDateTime createdAt;
 
+    @Column(name = "tier",nullable = false)
+    private String tier;
 //    @OneToMany(
 //            mappedBy = "user",
 //            cascade = CascadeType.ALL,

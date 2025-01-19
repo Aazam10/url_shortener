@@ -13,4 +13,5 @@ public class OriginalUrlDto {
     private String url;
     private LocalDateTime expiryDate;
     private String shortCode;
+
 }

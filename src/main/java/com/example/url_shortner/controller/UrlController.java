@@ -5,9 +5,7 @@ import com.example.url_shortner.dto.BulkUrlRequestDto;
 import com.example.url_shortner.dto.InactiveUrlRequestDto;
 import com.example.url_shortner.dto.OriginalUrlDto;
 import com.example.url_shortner.dto.ShortCodeResponseDto;
-import com.example.url_shortner.exceptions.EmptyUrlException;
-import com.example.url_shortner.exceptions.NoSuchUserFoundException;
-import com.example.url_shortner.exceptions.ResourceNotFoundException;
+import com.example.url_shortner.exceptions.*;
 import com.example.url_shortner.model.UrlModel;
 import com.example.url_shortner.service.UrlService;
 import org.springframework.http.HttpStatus;
@@ -31,6 +29,8 @@ public class UrlController {
     public ResponseEntity<?> createShortUrl(@RequestHeader(name = "x-api-key")String api_key,
                                             @RequestBody OriginalUrlDto originalUrlDto){
         String url = originalUrlDto.getUrl();
+
+        System.out.println(" short code is " + originalUrlDto.getShortCode());
 
         if(url.trim().isEmpty()){
            throw new EmptyUrlException("Requested url to shorten cannot bes Empty",HttpStatus.BAD_REQUEST);
@@ -109,5 +109,15 @@ public class UrlController {
         return ResponseEntity
                 .status(ex.statusCode)
                 .body(ex.getMessage());
+    }
+
+    @ExceptionHandler(NotAuthorizedException.class)
+    public ResponseEntity<String> handleUnauthorizedException(NotAuthorizedException ex){
+        return new ResponseEntity<>(ex.getMessage(),ex.httpStatus);
+    }
+
+    @ExceptionHandler(DuplicateShortCodeException.class)
+    public ResponseEntity<String> handleExistingShortCode(DuplicateShortCodeException ex){
+        return new ResponseEntity<>(ex.getMessage(),ex.httpStatusCode);
     }
 }

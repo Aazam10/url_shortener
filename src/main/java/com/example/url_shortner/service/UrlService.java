@@ -4,6 +4,8 @@ package com.example.url_shortner.service;
 import com.example.url_shortner.dto.OriginalUrlDto;
 import com.example.url_shortner.dto.ShortCodeResponseDto;
 import com.example.url_shortner.exceptions.NoSuchUserFoundException;
+
+import com.example.url_shortner.exceptions.NotAuthorizedException;
 import com.example.url_shortner.exceptions.ResourceNotFoundException;
 import com.example.url_shortner.exceptions.DuplicateShortCodeException;
 import com.example.url_shortner.model.UrlModel;
@@ -59,6 +61,8 @@ public class UrlService {
             String shortCode = getShortCode(urlDto);
 //            Integer id = sequenceService.getNextSequenceValue();
 //        System.out.println(" id is " + id);
+
+        System.out.println(" short code final is "+shortCode);
             UrlModel urlModel = createUrlModel(urlDto,shortCode,user);
 
             urlRepository.save(urlModel);
@@ -79,6 +83,10 @@ public class UrlService {
         List<UrlModel> urlsToSave = new ArrayList<>();
 
         User user = getUserByApiKey(apiKey);
+
+        if(!user.getTier().equalsIgnoreCase("enterprise")){
+            throw new NotAuthorizedException(" Please upgrade your plan to create urls in bulk",HttpStatus.FORBIDDEN);
+        }
 
         Set<String> generatedCodes = new HashSet<>();
         // Pre-generate and validate all short codes
@@ -176,6 +184,7 @@ public class UrlService {
 
     private String getShortCode(OriginalUrlDto urlDto){
         if(hasCustomShortCode(urlDto)){
+            System.out.println(" here in provided short code");
             String shortCode = urlDto.getShortCode().trim();
             if(validateShortCodeUniqueness(shortCode)){
                 throw new DuplicateShortCodeException(" The short code provided by you already exists",HttpStatus.BAD_REQUEST);
