@@ -10,17 +10,22 @@ import com.example.url_shortner.model.UrlModel;
 import com.example.url_shortner.model.User;
 import com.example.url_shortner.repository.UrlRepository;
 import com.example.url_shortner.repository.UserRepository;
-import jakarta.transaction.Transactional;
+import jakarta.persistence.EntityManager;
+
+import org.hibernate.Session;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.sql.PreparedStatement;
 import java.time.LocalDateTime;
-import java.util.Base64;
-import java.util.Optional;
+import java.util.*;
 
 @Service
 public class UrlService {
@@ -31,74 +36,185 @@ public class UrlService {
 
     private final UserRepository userRepository;
 
-    public UrlService(UrlRepository urlRepository,UserRepository userRepository){
+    private final EntityManager entityManager;
+
+
+
+    @Value("${batch.size:50}")
+    private int batchSize;
+
+    public UrlService(UrlRepository urlRepository,UserRepository userRepository
+                      ,EntityManager entityManager){
         this.urlRepository = urlRepository;
         this.userRepository = userRepository;
+        this.entityManager = entityManager;
+
+    }
+
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    public ShortCodeResponseDto createShortUrl(OriginalUrlDto urlDto, String apiKey){
+
+            User user = getUserByApiKey(apiKey);
+
+            String shortCode = getShortCode(urlDto);
+//            Integer id = sequenceService.getNextSequenceValue();
+//        System.out.println(" id is " + id);
+            UrlModel urlModel = createUrlModel(urlDto,shortCode,user);
+
+            urlRepository.save(urlModel);
+            ShortCodeResponseDto shortCodeResponseDto = new ShortCodeResponseDto();
+            shortCodeResponseDto.setOriginalUrl(urlDto.getUrl());
+            shortCodeResponseDto.setShortCode(shortCode);
+            shortCodeResponseDto.setExpiryDate(urlDto.getExpiryDate());
+
+            return shortCodeResponseDto;
+
     }
 
     @Transactional
-    public ResponseEntity<?> createShortUrl(OriginalUrlDto urlDto, String apiKey){
+    public List<ShortCodeResponseDto> createBulkShortCodes(List<OriginalUrlDto> urls, String apiKey) {
 
-        Optional<User> user = userRepository.findByApiKey(apiKey);
+        List<ShortCodeResponseDto> shortCodeResponseDtoList = new ArrayList<>();
 
-        if(user.isEmpty()){
-            throw new NoSuchUserFoundException("No user with this api key is present",HttpStatus.NOT_FOUND);
+        List<UrlModel> urlsToSave = new ArrayList<>();
+
+        User user = getUserByApiKey(apiKey);
+
+        Set<String> generatedCodes = new HashSet<>();
+        // Pre-generate and validate all short codes
+
+
+        for(OriginalUrlDto url :urls){
+            String shortCode = generateUniqueShortCodeWithRetry(url,generatedCodes);
+            generatedCodes.add(shortCode);
+            System.out.println(" original url "+ url.getUrl() + " short code " + shortCode);
+           UrlModel urlModel = createUrlModel(url,shortCode,user);
+
+            urlsToSave.add(urlModel);
+
+
+           ShortCodeResponseDto shortCodeResponseDto = new ShortCodeResponseDto();
+
+           shortCodeResponseDto.setOriginalUrl(url.getUrl());
+           shortCodeResponseDto.setShortCode(shortCode);
+           shortCodeResponseDto.setExpiryDate(url.getExpiryDate());
+           shortCodeResponseDtoList.add(shortCodeResponseDto);
+
+
+           if(urlsToSave.size() >= batchSize){
+               saveBatchSafely(urlsToSave);
+               urlsToSave.clear();
+           }
         }
+        if (!urlsToSave.isEmpty()) {
+            saveBatchSafely(urlsToSave);
+        }
+        return shortCodeResponseDtoList;
+    }
 
-        try{
+    private void saveBatchSafely(List<UrlModel> batch) {
+        try {
+            Session session = entityManager.unwrap(Session.class);
+            session.doWork(connection -> {
+                String insertSql = "INSERT INTO url_shortener (original_url, short_code, " +
+                        "num_visited, user_id, expiry_date) VALUES (?, ?, ?, ?, ?)";
 
-            if(urlDto.getShortCode() != null && !urlDto.getShortCode().trim().isEmpty()){
-                String short_code = urlDto.getShortCode().trim();
-                Optional<UrlModel> existingUrlModel = urlRepository.findByShortCode(short_code);
+                try (PreparedStatement pstmt = connection.prepareStatement(insertSql)) {
+                    connection.setAutoCommit(false);
 
-                if(existingUrlModel.isPresent()){
-                    throw new DuplicateShortCodeException(" The short code provided by you already exists",HttpStatus.BAD_REQUEST);
-                }else{
-                    String url = urlDto.getUrl();
+                    for (UrlModel url : batch) {
+                        pstmt.setString(1, url.getOriginalUrl());
+                        pstmt.setString(2, url.getShortCode());
+                        pstmt.setInt(3, url.getNumVisited());
+                        pstmt.setInt(4, url.getUser().getId());
+                        pstmt.setString(5, url.getExpiryDate() != null ? url.getExpiryDate().toString() : null);
 
+                        pstmt.addBatch();
+                    }
 
-                    UrlModel urlModel = new UrlModel();
-
-                    urlModel.setOriginalUrl(url);
-                    urlModel.setShortCode(short_code);
-                    urlModel.setNumVisited(0);
-                    urlModel.setUser(user.get());
-                    urlModel.setExpiryDate(urlDto.getExpiryDate());
-
-                    urlRepository.save(urlModel);
-
-                    return new ResponseEntity<ShortCodeResponseDto>(new ShortCodeResponseDto(short_code), HttpStatus.CREATED);
+                    pstmt.executeBatch();
+                    connection.commit();
                 }
-            }else{
-                String url = urlDto.getUrl();
-                String short_code = generateUniqueShortCode(url);
+            });
 
-                UrlModel urlModel = new UrlModel();
-
-                urlModel.setOriginalUrl(url);
-                urlModel.setShortCode(short_code);
-                urlModel.setNumVisited(0);
-                urlModel.setUser(user.get());
-                urlModel.setExpiryDate(urlDto.getExpiryDate());
-
-                urlRepository.save(urlModel);
-
-                return new ResponseEntity<ShortCodeResponseDto>(new ShortCodeResponseDto(short_code), HttpStatus.CREATED);
-            }
-
-
-        }catch(DataAccessException e){
-            return new ResponseEntity<String>(e.getMessage(),HttpStatus.INTERNAL_SERVER_ERROR);
+            entityManager.clear();
+        } catch (Exception e) {
+            System.out.println("Error saving batch: "+ e);
+            throw new RuntimeException("Failed to save URL batch", e);
         }
+    }
 
+    private String generateUniqueShortCodeWithRetry(OriginalUrlDto urlDto, Set<String> existingCodes) {
+        String shortCode;
+        int attempts = 0;
+        do {
+            if (hasCustomShortCode(urlDto)) {
+                shortCode = urlDto.getShortCode().trim();
+                if (validateShortCodeUniqueness(shortCode)) {
+                    throw new DuplicateShortCodeException("Custom short code already exists", HttpStatus.BAD_REQUEST);
+                }
+            } else {
+                shortCode = generateUniqueShortCode(urlDto.getUrl() + attempts);
+            }
+            attempts++;
+
+            if (attempts > 5) {
+                throw new RuntimeException("Failed to generate unique short code after 5 attempts");
+            }
+        } while (existingCodes.contains(shortCode) || validateShortCodeUniqueness(shortCode));
+
+        return shortCode;
+    }
+
+    private User getUserByApiKey(String apiKey){
+        return userRepository.findByApiKey(apiKey)
+                .orElseThrow(() -> new NoSuchUserFoundException(
+                        "No user with this api key is present",
+                        HttpStatus.NOT_FOUND));
+    }
+
+
+    private String getShortCode(OriginalUrlDto urlDto){
+        if(hasCustomShortCode(urlDto)){
+            String shortCode = urlDto.getShortCode().trim();
+            if(validateShortCodeUniqueness(shortCode)){
+                throw new DuplicateShortCodeException(" The short code provided by you already exists",HttpStatus.BAD_REQUEST);
+            }
+            return shortCode;
+        }
+        return generateUniqueShortCode(urlDto.getUrl());
+    }
+
+    private boolean validateShortCodeUniqueness(String shortCode){
+        return urlRepository.findByShortCode(shortCode).isPresent();
+    }
+
+    private boolean hasCustomShortCode(OriginalUrlDto urlDto){
+        return urlDto.getShortCode() != null && !urlDto.getShortCode().trim().isEmpty();
+    }
+
+    private UrlModel createUrlModel(OriginalUrlDto urlDto,String shortCode,User user){
+        UrlModel urlModel = new UrlModel();
+//        urlModel.setId(id);
+        urlModel.setOriginalUrl(urlDto.getUrl());
+        urlModel.setShortCode(shortCode);
+        urlModel.setUser(user);
+        urlModel.setExpiryDate(urlDto.getExpiryDate());
+        urlModel.setNumVisited(0);
+        return urlModel;
     }
 
     public Optional<UrlModel> getOriginalUrl(String shortCode){
         Optional<UrlModel> url = urlRepository.findByShortCode(shortCode);
-
+//add expiry check
         if(url.isPresent()){
-            url.get().setNumVisited(url.get().getNumVisited() + 1);
-            urlRepository.save(url.get());
+            if(url.get().getDeletedOn() == null){
+                url.get().setNumVisited(url.get().getNumVisited() + 1);
+                urlRepository.save(url.get());
+            }else{
+                return Optional.empty();
+            }
+
         }
 
         return url;
@@ -145,9 +261,12 @@ public class UrlService {
         if(!user.get().getApiKey().equals(api_key)){
             throw new NoSuchUserFoundException(" The api key is not associated with the owner of code " , HttpStatus.BAD_REQUEST);
         }
+        url.get().setDeletedOn(LocalDateTime.now());
+        urlRepository.save(url.get());
 
-        urlRepository.deleteByShortCode(shortCode);
     }
+
+
 
     private String generateUniqueShortCode(String originalUrl) {
         try {

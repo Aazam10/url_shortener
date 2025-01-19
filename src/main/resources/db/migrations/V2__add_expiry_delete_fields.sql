@@ -1,0 +1,2 @@
+ALTER TABLE url_shortener ADD COLUMN deleted_on TEXT DEFAULT NULL;
+ALTER TABLE url_shortener ADD COLUMN expiry_date TEXT DEFAULT NULL;

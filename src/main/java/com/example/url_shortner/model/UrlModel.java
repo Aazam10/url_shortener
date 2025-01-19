@@ -19,8 +19,8 @@ import java.time.LocalDateTime;
 @Table(name = "url_shortener")
 public class UrlModel {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+   @Id
+   @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
     @Column(name="original_url",nullable = false)
@@ -32,7 +32,7 @@ public class UrlModel {
     @CreationTimestamp
     @Column(name="created_at",nullable = false,columnDefinition = "TEXT")
     @Convert(converter = TextBasedDateTimeConverter.class)
-    private LocalDateTime created_at;
+    private LocalDateTime createdAt;
 
 
     @Column(name="num_visited",nullable = false)
@@ -54,6 +54,8 @@ public class UrlModel {
     @Convert(converter = TextBasedDateTimeConverter.class)
     private LocalDateTime expiryDate;
 
-
+    @Column(name="deleted_on",nullable = true,columnDefinition = "TEXT")
+    @Convert(converter = TextBasedDateTimeConverter.class)
+    private LocalDateTime deletedOn;
 
 }
