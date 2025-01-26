@@ -12,5 +12,5 @@ import java.util.List;
 @Setter
 public class BulkShortCodeResponseDto {
 
-    List<ShortCodeResponseDto> shortCodes;
+    List<UrlDetailsResponseDto> shortCodes;
 }

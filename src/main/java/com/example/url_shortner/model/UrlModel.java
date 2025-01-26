@@ -1,6 +1,8 @@
 package com.example.url_shortner.model;
 
 import com.example.url_shortner.utils.TextBasedDateTimeConverter;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -43,6 +45,7 @@ public class UrlModel {
     @Convert(converter = TextBasedDateTimeConverter.class)
     private LocalDateTime lastVisitedAt;
 
+@JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(
             name = "user_id",
@@ -57,5 +60,8 @@ public class UrlModel {
     @Column(name="deleted_on",nullable = true,columnDefinition = "TEXT")
     @Convert(converter = TextBasedDateTimeConverter.class)
     private LocalDateTime deletedOn;
+
+    @Column(name ="password",nullable = true)
+    private String password;
 
 }

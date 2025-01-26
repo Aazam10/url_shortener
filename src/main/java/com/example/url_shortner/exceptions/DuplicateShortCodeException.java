@@ -1,13 +1,20 @@
 package com.example.url_shortner.exceptions;
 
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 
+@Getter
+@Setter
+@NoArgsConstructor
 public class DuplicateShortCodeException extends RuntimeException{
 
-    public HttpStatusCode httpStatusCode;
+    public HttpStatus statusCode;
 
-    public DuplicateShortCodeException(String message,HttpStatusCode httpStatusCode){
+    public DuplicateShortCodeException(String message,HttpStatus statusCode){
         super(message);
-        this.httpStatusCode = httpStatusCode;
+        this.statusCode = statusCode;
     }
 }

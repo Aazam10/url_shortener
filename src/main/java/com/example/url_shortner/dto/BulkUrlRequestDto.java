@@ -12,5 +12,5 @@ import java.util.List;
 @NoArgsConstructor
 public class BulkUrlRequestDto {
 
-    private List<OriginalUrlDto> urls;
+    private List<CreateUrlRequestDto> urls;
 }

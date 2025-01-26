@@ -1,22 +1,17 @@
 package com.example.url_shortner.dto;
 
-
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.time.LocalDateTime;
+import java.awt.*;
 
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class ShortCodeResponseDto {
-    private String shortCode;
+public class UpdateUrlPasswordDto {
 
-    private String originalUrl;
-
-    private LocalDateTime expiryDate;
-
+    private String password;
 }
